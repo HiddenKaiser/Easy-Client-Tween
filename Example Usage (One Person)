@@ -1,0 +1,33 @@
+local rep = game:GetService("ReplicatedStorage")
+
+local EasyTween = require(rep:WaitForChild("EasyClientTween")) --Require the module from ReplicatedStorage by name
+local tweenHandler = EasyTween.new(true,nil,nil,nil)  --You can just leave nils blank. The settings can be changes as following: EasyTween.new(Cancellable, InStarterPlayer, ClientSync, DebugModeOverride)
+
+local twinfo = {1.5}
+
+local part = workspace:WaitForChild("TweenExample2")
+
+local origPosition = part.Position
+local newPos = part.Position + Vector3.new(0,0,10)
+
+local clickDetector = part:WaitForChild("ClickDetector")
+
+local deb = false --Debounce
+local pos = true
+
+clickDetector.MouseClick:Connect(function(plr)
+	if deb == true then return end
+	deb = true --Debounce enable
+	
+	if pos == true then --Toggle
+		pos = false
+		tweenHandler:TweenClient(plr, part, twinfo, {Position = newPos, Color = Color3.fromRGB(255, 47, 47)})
+	else
+		pos = true
+		tweenHandler:TweenClient(plr, part, twinfo, {Position = origPosition, Color = Color3.fromRGB(76, 255, 142)})
+	end
+	--wait(0.1)
+	deb = false --Debounce disable
+end)
+
+--HiddenKaiser
