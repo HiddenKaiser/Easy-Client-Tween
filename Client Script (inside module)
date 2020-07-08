@@ -1,0 +1,29 @@
+--HiddenKaiser#0001
+local ts = game:GetService("TweenService")
+local event = script:WaitForChild("Event").Value --Value parented to the local script with the communicate event as it's value
+
+local rep = game:GetService("ReplicatedStorage")
+local func = require(rep:WaitForChild("EasyClientTween"):WaitForChild("TickSyncer"))
+
+if not event then warn("No event found") return end
+
+event.OnClientEvent:Connect(function(object, info, properties, Settings, gameTick, CancelEvent) -- Recieve request from the server
+	local tween
+	local currentTick = func:GetTime() -- Get current time
+	local ping = (currentTick - gameTick) --Get the ping
+	--print(ping)
+	if Settings.Sync == true then info[1] = (info[1] - ping) end --Subtract the tween time by players ping so it's synced up on all clients
+	info = TweenInfo.new(unpack(info))
+	
+	local success, errorStatement = pcall(function() tween = ts:Create(object,info,properties) end) --pcall allows us to see errors
+	if (success == false or tween == nil) and Settings.PrintErrors == true then warn("Check passed properties for tween: [" ..properties .."]") return end -- Print error statement since a lot of begginners are probably gonna use this.
+	tween:Play()
+	local connection; local function cancelTween(objectToBeCancelled) if object == objectToBeCancelled then if connection then connection:Disconnect() connection = nil end tween:Cancel(); tween = nil end end -- compressed function that cancels the tween
+	if CancelEvent then
+		connection = CancelEvent.OnClientEvent:Connect(cancelTween)
+		if info.RepeatCount >= 0 then --If repeats forever then will wait until is cancelled
+			for i = 1,(1 + info.RepeatCount) do wait(info.Part) end --Wait until all repeats are done
+			if connection then connection:Disconnect() connection = nil end --Disconnect the end function since the tween finished
+		end
+	end
+end)
