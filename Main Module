@@ -7,25 +7,36 @@ HOW TO USE:
 		local EasyTween = require(rep:WaitForChild("EasyClientTween"))
 	3. Create the tween handler
 		local EasyTween = require(rep:WaitForChild("EasyClientTween"))
-		local tweenHandler = EasyTween.new(Cancellable, InStarterPlayer, ClientSync, DebugModeOverride)
+		local tweenObject = EasyTween.new(Cancellable, InStarterPlayer, ClientSync, DebugModeOverride)
 		
 	4. Wherever you wanna tween (such as in a function, go about doing a regular tweenService:Create() but make tweenInfo in a table, ex: {time, easingstyle, easingdirection}
 		local EasyTween = require(rep:WaitForChild("EasyClientTween"))
-		local tweenHandler = EasyTween.new(Cancellable, InStarterPlayer, ClientSync, DebugModeOverride) -- Can leave blank to have defaults, ex: local tweenHandler = EasyTween.new()
+		local tweenObject = EasyTween.new(Cancellable, InStarterPlayer, ClientSync, DebugModeOverride) -- Can leave blank to have defaults, ex: local tweenObject = EasyTween.new()
 		
 		To make it tween for EVERYONE: 
-			tweenHandler:TweenAllClients(objectToChange, TweenInfoTable, ValuesToTweenTable)
+			tweenObject:TweenAllClients(objectToChange, TweenInfoTable, ValuesToTweenTable)
 				-- Keep in mind that tweeninfo table is not TweenInfo.new() and is "{ Tweeninfo values here }"
 			
-			Ex: tweenHandler:TweenAllClients(objectToChange, {1.5, Enum.EasingStyle.Linear}, {Position = Vector3.new(0,5,0})
+			Ex: tweenObject:TweenAllClients(objectToChange, {1.5, Enum.EasingStyle.Linear}, {Position = Vector3.new(0,5,0})
 		
 		
 		To make it tween for ONLY ONE person:
 			local playerObject = game.Players.HiddenKaiser
-			tweenHandler:TweenClient(playerObject, objectToChange, TweenInfoTable, ValuesToTweenTable)
+			tweenObject:TweenClient(playerObject, objectToChange, TweenInfoTable, ValuesToTweenTable)
 			
-			Ex: tweenHandler:TweenClient(playerObject, objectToChange, {1.5, Enum.EasingStyle.Quad}, {Position = Vector3.new(0,5,0})
+			Ex: tweenObject:TweenClient(playerObject, objectToChange, {1.5, Enum.EasingStyle.Quad}, {Position = Vector3.new(0,5,0})
 		
+	
+	5. Extra API
+	
+		void EasyTween:Cancel(instance Object)
+		
+			Cancels all tweens on a specific object
+	
+		void tweenObject:Destroy()
+			
+			Cleans up the tween and removes old values
+			
 -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
 	If you have any more ideas on what to make next DM me on discord @HiddenKaiser#0001 or reply to the devforum topic.
@@ -33,62 +44,21 @@ HOW TO USE:
 --]]
 
 --Made by HiddenKaiser#0001
+
 local rep = game:GetService("ReplicatedStorage")
 local run = game:GetService("RunService")
 local players = game:GetService("Players")
 local debris = game:GetService("Debris")
 
-local com = script:WaitForChild("Communicate")
-local clientSide = script:FindFirstChild("EasyTweenClient")
+local communicate = script:WaitForChild("Communicate")
+local clientSide = script:FindFirstChildWhichIsA("LocalScript") or script:WaitForChild("EasyTweenClient")
+local tickSync = require(rep:WaitForChild("EasyClientTween"):WaitForChild("TickSyncer"))
+
+local cancelledEvent = Instance.new("BindableEvent")
 
 local Replication = {}
 Replication.__index = Replication -- Allows us to set metatables
 
-local func = require(rep:WaitForChild("EasyClientTween"):WaitForChild("TickSyncer"))
-
-function addClient(plr)
-	if not plr.Backpack:FindFirstChild(clientSide.Name) then --Check if player already has it "not" means checking if it *is* nil, and if it *is* nil then clone the script into the backpack
-		local c = clientSide:Clone()
-		c.Parent = plr.Backpack --Copy it into the players backpack
-		c.Disabled = false --Make the script actually run lol
-	end
-end
-
-function addClientToPlayers() -- For new scripters to make it easy to just put the script in
-	for i,plr in pairs(players:GetPlayers()) do --Get all players
-		addClient(plr) --Read function above
-	end
-end
-
---Replication is now the metatable we set with EasyClientTween.new
-
-function Replication:TweenAllClients(object, info, properties) -- Tell all players to tween
-	if not properties or not object then return end ---If this stuff is missing then return end
-	if info == nil then info = TweenInfo.new(1) end -- If tweeninfo is nil then make it a info that takes one second to complete
-
-	local Settings = self.Settings
-	if Settings.PlacedAlready == false then
-		addClientToPlayers() --Add client script to players who don't have it
-	end
-	
-	if Settings.CanBeCancelled == true then  if self.CancelEvent == nil then  self.CancelEvent = Instance.new("RemoteEvent")  else self.CancelEvent:FireAllClients(object) end  end
-	func:Sync() --Handle the cancel event
-	com:FireAllClients(object, info, properties, Settings, tick(), self.CancelEvent) --Tell the client to tween
-end
-
-function Replication:TweenClient(playerObject, object, info, properties) -- Tell a certain player to tween
-	if not properties or not object then return end ---If this stuff is missing then return end
-	if info == nil then info = {1} end -- If tweeninfo is nil then make it a info that takes one second to complete
-	
-	local Settings = self.Settings
-	if Settings.PlacedAlready == false then
-		addClient(playerObject) --Add client script to the player if they don't have it
-	end
-	
-	if Settings.CanBeCancelled == true then  if self.CancelEvent == nil then  self.CancelEvent = Instance.new("RemoteEvent")  else self.CancelEvent:FireAllClients(object) end  end --Handle the cancel event
-	func:Sync()
-	com:FireClient(playerObject, object, info, properties, Settings, tick(), self.CancelEvent) --Send the message to the clients
-end
 
 function Replication.new(Cancellable, InStarterPlayer, ClientSync, DebugModeOverride)
 	local self = {
@@ -98,11 +68,110 @@ function Replication.new(Cancellable, InStarterPlayer, ClientSync, DebugModeOver
 			CanBeCancelled = Cancellable or false; --If the tween gets cancelled when a tween is made for the same object
 			PrintErrors = DebugModeOverride or true; --I would reccomend to keep on true, helps to tell you if you gave the wrong data
 		};
+		
+		CompletedEvent = Instance.new("BindableEvent");
+		Completed = nil;
+		
+		Cancelled = false;
 		CancelEvent = nil; -- This is to store the event for later, dont touch.
 	}
+	
 	setmetatable(self, Replication) --Sets a metatable which lets us index self later
 	
+	self.Completed = self.CompletedEvent.Event;
+
 	return self --Return the table with our functions that allow us to index self later.
+end
+
+function Replication:addClient(plr)
+	if not plr.PlayerGui:FindFirstChild(clientSide.Name) then --Check if player already has it "not" means checking if it *is* nil, and if it *is* nil then clone the script into the backpack
+		local c = clientSide:Clone()
+		c.Parent = plr.PlayerGui --Copy it into the players backpack
+		c.Disabled = false --Make the script actually run lol
+	end
+end
+
+function Replication:addClientToPlayers() -- For new scripters to make it easy to just put the script in
+	for i,plr in pairs(players:GetPlayers()) do --Get all players
+		Replication:addClient(plr) --Read function above
+	end
+end
+
+--Replication is now the metatable we set with EasyClientTween.new
+
+function Replication:TweenAllClients(object, info, properties) -- Tell all players to tween
+	if not properties or not object then return end ---If this stuff is missing then return end
+	if not info then info = TweenInfo.new(1) end -- If tweeninfo is nil then make it a info that takes one second to complete
+
+	local Settings = self.Settings
+	if not Settings.PlacedAlready then
+		Replication:addClientToPlayers() --Add client script to players who don't have it
+	end
+	
+	if Settings.CanBeCancelled then
+		if not self.CancelEvent then
+			self.CancelEvent = Instance.new("RemoteEvent")
+		else
+			self.CancelEvent:FireAllClients(object)
+		end  
+	end --Handle the cancel event
+	
+	tickSync:Sync() --Handle the cancel event
+	communicate:FireAllClients(object, info, properties, Settings, tick(), self.CancelEvent) --Tell the client to tween
+end
+
+function Replication:TweenClient(playerObject, object, info, properties) -- Tell a certain player to tween
+	if not properties or not object then return end ---If this stuff is missing then return end
+	if not info then info = {1} end -- If tweeninfo is nil then make it a info that takes one second to complete
+	
+	local Settings = self.Settings
+	if not Settings.PlacedAlready then
+		Replication:addClient(playerObject) --Add client script to the player if they don't have it
+	end
+	
+	if Settings.CanBeCancelled then
+		if not self.CancelEvent then
+			self.CancelEvent = Instance.new("RemoteEvent")
+		else
+			self.Cancelled = true
+			self.CancelEvent:FireAllClients(object)
+		end
+	end --Handle the cancel event
+	
+	tickSync:Sync()
+	
+	communicate:FireClient(playerObject, object, info, properties, Settings, tick(), self.CancelEvent) --Send the message to the clients
+	
+	if info[1] then
+		coroutine.wrap(function()
+			wait(info[1])
+			
+			if not self.Cancelled then
+				self.CompletedEvent:Fire()
+			end
+		end)()
+	end
+end
+
+function Replication:Destroy()
+	local function destroy(obj)
+		if obj then
+			return obj:Destroy()
+		end
+	end
+	
+	destroy(self.CompletedEvent)
+	destroy(self.CancelEvent)
+
+	setmetatable(self, {__mode = "k"}); -- kill the table
+end
+
+function Replication:Cancel(object)
+	assert((object and typeof(object) == "Instance"),  "argument 1, \"object\" must be an instance")
+	
+	if self.CancelEvent then
+		self.CancelEvent:FireAllClients(object)
+	end
 end
 
 return Replication --Return the module
