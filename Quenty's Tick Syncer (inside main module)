@@ -1,4 +1,4 @@
---Made by Quenty and not by HiddenKaiser
+--Made by Quenty and edited by HiddenKaiser
 --- Syncronize time between client and servers so we can use a universal timestamp
 -- across the game.
 -- See: www.nist.gov/el/isd/ieee/upload/tutorial-basic.pdf
@@ -21,15 +21,15 @@ function MasterClock.new(remoteEvent, remoteFunction)
 		return self:_handleDelayRequest(timeThree)
 	end
 	self._remoteEvent.OnServerEvent:Connect(function(player)
-		 self._remoteEvent:FireClient(player, self:GetTime())
+		self._remoteEvent:FireClient(player, self:GetTime())
 	end)
 
-	spawn(function()
+	coroutine.wrap(function()
 		while true do
 			wait(5)
 			self:Sync()
 		end
-	end)
+	end)()
 
 	return self
 end
@@ -83,7 +83,6 @@ end
 
 function SlaveClock:GetTime()
 	if not self:IsSynced() then
-		warn("[SlaveClock][GetTime] - Slave clock is not yet synced")
 		return self:_getLocalTime()
 	end
 
